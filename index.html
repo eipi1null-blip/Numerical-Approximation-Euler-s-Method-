@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Euler Method on a Slope Field</title>
+  <style>
+    :root {
+      --ink: #303137;
+      --axis: #3d3e44;
+      --grid: #d0d3d7;
+      --field: #be3a6e;
+      --blue: #214a9a;
+      --orange: #d9732f;
+      --green: #32845a;
+      --purple: #6946a7;
+      --panel: #eef3fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f8f9fb;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    main {
+      width: min(1220px, calc(100vw - 14px));
+      margin: 0 auto;
+      padding: 8px 0 20px;
+    }
+    .applet {
+      border: 2px solid #8b8b8b;
+      background: #fff;
+      min-height: 720px;
+      display: grid;
+      grid-template-rows: minmax(460px, 1fr) auto;
+      overflow: hidden;
+    }
+    .graph-wrap {
+      position: relative;
+      min-height: 460px;
+      background: #fff;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    .topbar {
+      position: absolute;
+      inset: 16px 18px auto 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .badge {
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(60,62,70,.18);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: 700 clamp(.95rem, 1.7vw, 1.2rem) Georgia, serif;
+      box-shadow: 0 2px 6px rgba(0,0,0,.11);
+    }
+    .panel {
+      border-top: 2px solid #7890c3;
+      background: var(--panel);
+      padding: 18px clamp(18px, 4vw, 58px) 22px;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 26px;
+      align-items: center;
+    }
+    .controls {
+      display: grid;
+      gap: 16px;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: clamp(1rem, 2vw, 1.35rem);
+      font-weight: 800;
+      cursor: pointer;
+      user-select: none;
+    }
+    .check input {
+      width: 34px;
+      height: 34px;
+      accent-color: #655ad4;
+    }
+    .step-buttons {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 2px solid rgba(37,49,86,.22);
+      border-radius: 5px;
+      background: #fff;
+      color: #343642;
+      padding: 9px 13px;
+      font-size: clamp(.95rem, 1.7vw, 1.15rem);
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button.active {
+      background: #2b4f9e;
+      color: white;
+      border-color: #2b4f9e;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: min(520px, 100%);
+    }
+    input[type="range"] {
+      width: min(460px, 52vw);
+      accent-color: #e88da7;
+    }
+    .readout {
+      display: grid;
+      gap: 9px;
+      font: 700 clamp(1rem, 2.1vw, 1.35rem) Georgia, serif;
+      color: #35405a;
+    }
+    .estimate {
+      color: #c43b70;
+      font-size: clamp(1.15rem, 2.4vw, 1.65rem);
+    }
+    .table {
+      display: grid;
+      gap: 6px;
+      font-size: clamp(.92rem, 1.7vw, 1.05rem);
+      font-weight: 700;
+    }
+    .table div {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 780px) {
+      .applet { min-height: 780px; }
+      .panel { grid-template-columns: 1fr; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      input[type="range"] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="applet" aria-label="Euler method slope field applet">
+    <div class="graph-wrap">
+      <canvas id="graph" aria-label="Slope field showing Euler method paths"></canvas>
+      <div class="topbar">
+        <div class="badge">y' = x - y^2, &nbsp; y(1) = 1.5</div>
+        <div class="badge">Estimate y(2)</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="controls">
+        <div class="control-row">
+          <label class="check"><input id="showAll" type="checkbox" checked>Compare step sizes</label>
+          <label class="check"><input id="showField" type="checkbox" checked>Show slope field</label>
+        </div>
+        <div class="control-row">
+          <span class="check">Step size</span>
+          <div class="step-buttons" id="stepButtons"></div>
+        </div>
+        <div class="slider-row">
+          <span class="check">Trace</span>
+          <input id="traceSlider" type="range" min="0" max="100" value="0">
+          <span id="traceText" class="check">0%</span>
+        </div>
+      </div>
+      <div class="readout">
+        <div class="estimate" id="estimate"></div>
+        <div id="formula"></div>
+        <div class="table" id="comparison"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const canvas = document.getElementById("graph");
+  const ctx = canvas.getContext("2d");
+  const showAll = document.getElementById("showAll");
+  const showField = document.getElementById("showField");
+  const stepButtons = document.getElementById("stepButtons");
+  const traceSlider = document.getElementById("traceSlider");
+  const traceText = document.getElementById("traceText");
+  const estimate = document.getElementById("estimate");
+  const formula = document.getElementById("formula");
+  const comparison = document.getElementById("comparison");
+
+  const xMin = 0.55, xMax = 2.18;
+  const yMin = -0.15, yMax = 1.72;
+  const start = { x: 1, y: 1.5 };
+  const targetX = 2;
+  const steps = [
+    { h: 1, color: "#c43b70", label: "h = 1.0" },
+    { h: 0.5, color: "#d9732f", label: "h = 0.5" },
+    { h: 0.25, color: "#32845a", label: "h = 0.25" },
+    { h: 0.1, color: "#6946a7", label: "h = 0.1" }
+  ];
+  let activeH = 1;
+
+  function slope(x, y) {
+    return x - y * y;
+  }
+
+  function eulerPath(h) {
+    const pts = [{ x: start.x, y: start.y, m: slope(start.x, start.y) }];
+    let x = start.x;
+    let y = start.y;
+    const count = Math.round((targetX - start.x) / h);
+    for (let i = 0; i < count; i++) {
+      const m = slope(x, y);
+      const nextX = +(x + h).toFixed(10);
+      const nextY = y + h * m;
+      pts.push({ x: nextX, y: nextY, m: slope(nextX, nextY), fromSlope: m });
+      x = nextX;
+      y = nextY;
+    }
+    return pts;
+  }
+
+  function nice(n) {
+    if (Math.abs(n) < 0.0005) return "0";
+    return String(Math.round(n * 1000) / 1000).replace("-", "\u2212");
+  }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function plotRect() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    return { left: 58, right: w - 26, top: 12, bottom: h - 28 };
+  }
+
+  function sx(x) {
+    const r = plotRect();
+    return r.left + (x - xMin) / (xMax - xMin) * (r.right - r.left);
+  }
+
+  function sy(y) {
+    const r = plotRect();
+    return r.bottom - (y - yMin) / (yMax - yMin) * (r.bottom - r.top);
+  }
+
+  function drawGrid() {
+    const r = plotRect();
+    ctx.save();
+    ctx.strokeStyle = "#d0d3d7";
+    ctx.lineWidth = 1.1;
+    for (let x = 0.6; x <= 2.2; x += 0.1) {
+      ctx.beginPath();
+      ctx.moveTo(sx(x), r.top);
+      ctx.lineTo(sx(x), r.bottom);
+      ctx.stroke();
+    }
+    for (let y = -0.1; y <= 1.7; y += 0.1) {
+      ctx.beginPath();
+      ctx.moveTo(r.left, sy(y));
+      ctx.lineTo(r.right, sy(y));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function arrow(x1, y1, x2, y2) {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - 20 * Math.cos(angle - 0.34), y2 - 20 * Math.sin(angle - 0.34));
+    ctx.lineTo(x2 - 20 * Math.cos(angle + 0.34), y2 - 20 * Math.sin(angle + 0.34));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawAxes() {
+    const r = plotRect();
+    ctx.save();
+    ctx.strokeStyle = "#3d3e44";
+    ctx.fillStyle = "#3d3e44";
+    ctx.lineWidth = 3;
+    arrow(sx(xMin), sy(0), sx(xMax) - 2, sy(0));
+    arrow(sx(1), sy(yMin), sx(1), sy(yMax) + 2);
+
+    ctx.font = "700 25px Georgia, serif";
+    ctx.fillText("x", r.right - 18, sy(0) - 15);
+    ctx.fillText("y", sx(1) + 14, r.top + 30);
+
+    ctx.font = "700 18px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (const x of [1, 1.25, 1.5, 1.75, 2]) ctx.fillText(nice(x), sx(x), sy(0) + 8);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (const y of [0.5, 1, 1.5]) ctx.fillText(nice(y), sx(1) - 10, sy(y));
+    ctx.restore();
+  }
+
+  function drawSlopeField() {
+    if (!showField.checked) return;
+    ctx.save();
+    ctx.strokeStyle = "rgba(190,58,110,.86)";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    for (let x = 0.6; x <= 2.15; x += 0.1) {
+      for (let y = -0.05; y <= 1.7; y += 0.1) {
+        const m = slope(x, y);
+        const len = 0.045;
+        const norm = Math.hypot(1, m);
+        const dx = len / norm;
+        const dy = m * dx;
+        ctx.beginPath();
+        ctx.moveTo(sx(x - dx), sy(y - dy));
+        ctx.lineTo(sx(x + dx), sy(y + dy));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawDot(x, y, color, radius = 8) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(sx(x), sy(y), radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPath(step, selected, progress) {
+    const pts = eulerPath(step.h);
+    const totalSegments = pts.length - 1;
+    const traceAmount = Math.max(0, Math.min(totalSegments, totalSegments * progress));
+    const fullSegments = Math.floor(traceAmount);
+    const partial = traceAmount - fullSegments;
+    ctx.save();
+    ctx.strokeStyle = step.color;
+    ctx.lineWidth = selected ? 5 : 3;
+    ctx.globalAlpha = selected ? 1 : 0.58;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
+    for (let i = 1; i <= fullSegments; i++) {
+      ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
+    }
+    if (partial > 0 && fullSegments < totalSegments) {
+      const a = pts[fullSegments], b = pts[fullSegments + 1];
+      const x = a.x + (b.x - a.x) * partial;
+      const y = a.y + (b.y - a.y) * partial;
+      ctx.lineTo(sx(x), sy(y));
+    }
+    ctx.stroke();
+
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = selected ? 2.2 : 1.5;
+    for (let i = 0; i < fullSegments; i++) {
+      const a = pts[i], b = pts[i + 1];
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(a.y));
+      ctx.lineTo(sx(b.x), sy(b.y));
+      ctx.stroke();
+    }
+    if (partial > 0 && fullSegments < totalSegments) {
+      const a = pts[fullSegments], b = pts[fullSegments + 1];
+      const midX = a.x + (b.x - a.x) * partial;
+      const midY = a.y + (b.y - a.y) * partial;
+      ctx.beginPath();
+      ctx.moveTo(sx(a.x), sy(a.y));
+      if (partial <= 0.5) {
+        const horizontalT = partial * 2;
+        const x = a.x + (b.x - a.x) * horizontalT;
+        ctx.lineTo(sx(x), sy(a.y));
+      } else {
+        ctx.lineTo(sx(b.x), sy(a.y));
+        const verticalT = (partial - 0.5) * 2;
+        const y = a.y + (b.y - a.y) * verticalT;
+        ctx.lineTo(sx(b.x), sy(y));
+      }
+      ctx.stroke();
+      drawDot(midX, midY, step.color, selected ? 6 : 4.5);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    for (let i = 0; i <= fullSegments; i++) {
+      drawDot(pts[i].x, pts[i].y, step.color, selected ? 8 : 6);
+    }
+  }
+
+  function drawGuide() {
+    ctx.save();
+    ctx.strokeStyle = "rgba(25,40,70,.45)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(sx(targetX), plotRect().top);
+    ctx.lineTo(sx(targetX), plotRect().bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = "700 20px Georgia, serif";
+    ctx.fillStyle = "#343642";
+    ctx.fillText("x = 2", sx(targetX) + 8, plotRect().top + 32);
+    ctx.restore();
+  }
+
+  function updateReadout() {
+    const active = steps.find(s => s.h === activeH);
+    const pts = eulerPath(activeH);
+    const last = pts[pts.length - 1];
+    estimate.textContent = `${active.label}: y(2) ≈ ${nice(last.y)}`;
+    if (activeH === 1) {
+      formula.textContent = "With h = 1: y(2) = 1.5 + 1(1 - 1.5^2) = 0.25";
+    } else {
+      formula.textContent = `${pts.length - 1} Euler steps from x = 1 to x = 2`;
+    }
+    comparison.innerHTML = steps.map((s) => {
+      const p = eulerPath(s.h);
+      return `<div><span>${s.label}</span><span>y(2) ≈ ${nice(p[p.length - 1].y)}</span></div>`;
+    }).join("");
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    drawGrid();
+    drawSlopeField();
+    drawAxes();
+    drawGuide();
+    const progress = Number(traceSlider.value) / 100;
+    const visible = showAll.checked ? steps : steps.filter(s => s.h === activeH);
+    visible.forEach((s) => drawPath(s, s.h === activeH, progress));
+    updateReadout();
+  }
+
+  function buildStepButtons() {
+    stepButtons.innerHTML = "";
+    steps.forEach((s) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = s.label;
+      button.className = s.h === activeH ? "active" : "";
+      button.addEventListener("click", () => {
+        activeH = s.h;
+        [...stepButtons.children].forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        draw();
+      });
+      stepButtons.appendChild(button);
+    });
+  }
+
+  showAll.addEventListener("change", draw);
+  showField.addEventListener("change", draw);
+  traceSlider.addEventListener("input", () => {
+    traceText.textContent = `${traceSlider.value}%`;
+    draw();
+  });
+  window.addEventListener("resize", resize);
+  buildStepButtons();
+  resize();
+</script>
+</body>
+</html>
